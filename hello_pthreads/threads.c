@@ -10,8 +10,6 @@ void *myThread()
 {
 	for (int i = 0; i < 1000; i++)
 		counter++;
-
-	return NULL;
 }
 
 int main()

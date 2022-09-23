@@ -26,7 +26,7 @@ int main()
     {
         arg[i] = i;
         //	Create a thread with default attributes and no arguments
-        pthread_create(&tid[i], NULL, myThread, (void *)&arg[i]);
+        pthread_create(&tid[i], NULL, &myThread, (void *)&arg[i]);
     }
 
     for (int i = 0; i < NTHREADS; i++)

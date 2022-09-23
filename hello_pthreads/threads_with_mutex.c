@@ -30,7 +30,7 @@ int main()
     for (int i = 0; i < NTHREADS; i++)
     {
         //	Create a thread with default attributes and no arguments
-        pthread_create(&tid[i], NULL, myThread, NULL);
+        pthread_create(&tid[i], NULL, &myThread, NULL);
     }
 
     for (int i = 0; i < NTHREADS; i++)
