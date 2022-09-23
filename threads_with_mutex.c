@@ -41,5 +41,8 @@ int main()
 
     printf("Counter: %ld \n", counter);
 
+    // Destroy the mutex
+    pthread_mutex_destroy(&lock);
+
     return 0;
 }
