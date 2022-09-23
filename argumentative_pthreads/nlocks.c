@@ -59,11 +59,11 @@ int main()
 
 void *myThread(void *arg)
 {
-    int *i = (int *)arg;
+    int i = *((int *)arg);
     for (int j = 0; j < 1000; j++)
     {
-        pthread_mutex_lock(&lock[*i]);
-        data[*i]++;
-        pthread_mutex_unlock(&lock[*i]);
+        pthread_mutex_lock(&lock[i]);
+        data[i]++;
+        pthread_mutex_unlock(&lock[i]);
     }
 }
