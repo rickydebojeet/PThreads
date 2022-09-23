@@ -10,6 +10,8 @@ void *myThread()
 {
 	for (int i = 0; i < 1000; i++)
 		counter++;
+
+	return NULL;
 }
 
 int main()
@@ -20,7 +22,7 @@ int main()
 	for (int i = 0; i < NTHREADS; i++)
 	{
 		//	Create a thread with default attributes and no arguments
-		pthread_create(&tid[i], NULL, myThread, NULL);
+		pthread_create(&tid[i], NULL, &myThread, NULL);
 	}
 
 	for (int i = 0; i < NTHREADS; i++)
