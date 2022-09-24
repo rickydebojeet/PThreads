@@ -9,33 +9,103 @@ struct read_write_lock
 {
 	// If required, use this strucure to create
 	// reader-writer lock related variables
-
+	pthread_cond_t readLock;
+	pthread_cond_t writeLock;
+	pthread_mutex_t lock;
+	int readCount;
+	int writeCount;
+	int waitingReaders;
+	int waitingWriters;
 } rwlock;
+
+typedef struct
+{
+	int delay;
+	int id;
+
+} argument_t;
 
 long int data = 0; //	Shared data variable
 
 void InitalizeReadWriteLock(struct read_write_lock *rw)
 {
+	//	Initialize your reader-writer lock variables
+	pthread_cond_init(&rw->readLock, NULL);
+	pthread_cond_init(&rw->writeLock, NULL);
+	pthread_mutex_init(&rw->lock, NULL);
+	rw->readCount = 0;
+	rw->writeCount = 0;
+	rw->waitingReaders = 0;
+	rw->waitingWriters = 0;
+}
+
+void DestroyReadWriteLock(struct read_write_lock *rw)
+{
+	//	Destroy your reader-writer lock variables
+	pthread_cond_destroy(&rw->readLock);
+	pthread_cond_destroy(&rw->writeLock);
+	pthread_mutex_destroy(&rw->lock);
 }
 
 // The pthread based reader lock
 void ReaderLock(struct read_write_lock *rw)
 {
+	//	Acquire a reader lock
+	pthread_mutex_lock(&rw->lock);
+
+	if (rw->writeCount == 1 || rw->waitingWriters > 0)
+	{
+		rw->waitingReaders++;
+		pthread_cond_wait(&rw->readLock, &rw->lock);
+		rw->waitingReaders--;
+	}
+
+	rw->readCount++;
 }
 
 // The pthread based reader unlock
 void ReaderUnlock(struct read_write_lock *rw)
 {
+	pthread_mutex_unlock(&rw->lock);
+	rw->readCount--;
+	//	Release a reader lock
+	if (rw->waitingWriters > 0)
+	{
+		pthread_cond_signal(&rw->writeLock);
+	}
+	else
+	{
+		pthread_cond_broadcast(&rw->readLock);
+	}
 }
 
 // The pthread based writer lock
 void WriterLock(struct read_write_lock *rw)
 {
+	pthread_mutex_lock(&rw->lock);
+	if (rw->readCount > 0 || rw->writeCount == 1)
+	{
+		rw->waitingWriters++;
+		pthread_cond_wait(&rw->writeLock, &rw->lock);
+		rw->waitingWriters--;
+	}
+
+	rw->writeCount = 1;
 }
 
 // The pthread based writer unlock
 void WriterUnlock(struct read_write_lock *rw)
 {
+	pthread_mutex_unlock(&rw->lock);
+	rw->writeCount = 0;
+	if (rw->waitingWriters > 0)
+	{
+		pthread_cond_signal(&rw->writeLock);
+	}
+	else
+	{
+		pthread_cond_broadcast(&rw->readLock);
+	}
 }
 
 //	Call this function to delay the execution by 'delay' ms
@@ -54,36 +124,46 @@ void delay(int delay)
 // The pthread reader start function
 void *ReaderFunction(void *args)
 {
+	argument_t *arg = (argument_t *)args;
 	//	Delay the execution by arrival time specified in the input
-	
+	delay(arg->delay);
 	//	....
-
 	//  Get appropriate lock
 	//	Display  thread ID and value of the shared data variable
 	//
+	ReaderLock(&rwlock);
+	printf("Reader %d: %ld\n", arg->id, data);
 	//  Add a dummy delay of 1 ms before lock release
 	//	....
+	delay(1);
+	ReaderUnlock(&rwlock);
 }
 
 // The pthread writer start function
 void *WriterFunction(void *args)
 {
+	argument_t *arg = (argument_t *)args;
 	//	Delay the execution by arrival time specified in the input
-
+	delay(arg->delay);
 	//	....
 	//
 	//  Get appropriate lock
 	//	Increment the shared data variable
 	//	Display  thread ID and value of the shared data variable
 	//
+	WriterLock(&rwlock);
+	data++;
+	printf("Writer: %d, Data: %ld\n", arg->id, data);
 	//  Add a dummy delay of 1 ms before lock release
 	//	....
+	delay(1);
+	WriterUnlock(&rwlock);
 }
 
 int main(int argc, char *argv[])
 {
 	pthread_t *threads;
-	struct argument_t *arg;
+	argument_t *arg;
 
 	long int reader_number = 0;
 	long int writer_number = 0;
@@ -130,9 +210,47 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	// Initializing reader-writer lock
+	InitalizeReadWriteLock(&rwlock);
+
 	//	Create reader/writer threads based on the input and read and write.
+	threads = (pthread_t *)malloc(sizeof(pthread_t) * total_threads);
+	arg = (argument_t *)malloc(sizeof(argument_t) * total_threads);
+	for (int i = 0; i < count; i++)
+	{
+		if (rws[i] == 1)
+		{
+			for (int j = 0; j < nthread[i]; j++)
+			{
+				arg[thread_number].delay = delay[i];
+				arg[thread_number].id = reader_number;
+				pthread_create(&threads[thread_number], NULL, &ReaderFunction, &arg[thread_number]);
+				reader_number++;
+				thread_number++;
+			}
+		}
+		else
+		{
+			for (int j = 0; j < nthread[i]; j++)
+			{
+				arg[thread_number].delay = delay[i];
+				arg[thread_number].id = writer_number;
+				pthread_create(&threads[thread_number], NULL, &WriterFunction, &arg[thread_number]);
+				writer_number++;
+				thread_number++;
+			}
+		}
+	}
 
 	//  Clean up threads on exit
+	for (int i = 0; i < total_threads; i++)
+		pthread_join(threads[i], NULL);
+
+	// Destroy reader-writer lock
+	DestroyReadWriteLock(&rwlock);
+
+	free(threads);
+	free(arg);
 
 	exit(0);
 }
