@@ -11,7 +11,6 @@ int front = 0, rear = 0, taskCount = 0, queue[QUEUE_SIZE];
 
 pthread_mutex_t queueMutex;
 pthread_mutex_t taskMutex;
-pthread_cond_t queueCond;
 
 // Global variables to be updated by threads
 long sum = 0;
@@ -47,7 +46,6 @@ int main(int argc, char *argv[])
 
     pthread_mutex_init(&queueMutex, NULL);
     pthread_mutex_init(&taskMutex, NULL);
-    pthread_cond_init(&queueCond, NULL);
 
     // Create threads
     for (int i = 0; i < noThreads; i++)
@@ -97,7 +95,6 @@ int main(int argc, char *argv[])
 
     pthread_mutex_destroy(&queueMutex);
     pthread_mutex_destroy(&taskMutex);
-    pthread_cond_destroy(&queueCond);
 
     return (EXIT_SUCCESS);
 }
@@ -132,49 +129,27 @@ void processtask(long number)
 
 void *workerFunc(void *args)
 {
-    // Way 1: Busy waiting
-    // while (true)
-    // {
-    //     int item, found = false;
-    //     pthread_mutex_lock(&queueMutex);
-    //     if (taskCount > 0)
-    //     {
-    //         found = true;
-    //         item = queue_delete();
-    //         taskCount--;
-    //     }
-    //     pthread_mutex_unlock(&queueMutex);
-
-    //     if (found == true)
-    //     {
-    //         processtask(item);
-    //     }
-
-    //     if (done == true && taskCount == 0)
-    //     {
-    //         break;
-    //     }
-    // }
-
-    // Way 2: Condition variable
     while (true)
     {
-        int item;
+        int item, found = false;
+        pthread_mutex_lock(&queueMutex);
+        if (taskCount > 0)
+        {
+            found = true;
+            item = queue_delete();
+            taskCount--;
+        }
+        pthread_mutex_unlock(&queueMutex);
+
+        if (found == true)
+        {
+            processtask(item);
+        }
+
         if (done == true && taskCount == 0)
         {
             break;
         }
-        pthread_mutex_lock(&queueMutex);
-        while (taskCount == 0)
-        {
-            pthread_cond_wait(&queueCond, &queueMutex);
-        }
-
-        item = queue_delete();
-        taskCount--;
-
-        pthread_mutex_unlock(&queueMutex);
-        processtask(item);
     }
 
     return NULL;
@@ -186,7 +161,6 @@ void masterFunc(int item)
     queue_insert(item);
     taskCount++;
     pthread_mutex_unlock(&queueMutex);
-    pthread_cond_signal(&queueCond);
 }
 
 void queue_insert(int item)
